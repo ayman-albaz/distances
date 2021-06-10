@@ -10,5 +10,5 @@ jobs:
       - uses: jiro4989/setup-nim-action@v1
         with:
           nim-version: '1.4.6'
-      - run: nimble build -y
+      - run: nimble install -y
       - run: nimble test -y
