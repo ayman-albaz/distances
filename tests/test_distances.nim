@@ -1,7 +1,9 @@
 import std/math
 import std/sequtils
 import std/unittest
-import distances/seq
+import distances
+
+proc isNaN(x: float): bool = x != x
 
 suite "Distance functions":
 
@@ -12,17 +14,26 @@ suite "Distance functions":
   test "hamming distance with float":
     check hammingDistance(@[1.0, 2.0, 3.0], @[1.0, 3.0, 3.0]) == 1.0
 
+  test "hamming distance empty":
+    check hammingDistance(newSeq[int](0), newSeq[int](0)) == 0.0
+
   test "normalized hamming distance":
     check normalizedHammingDistance(@[1, 2, 3], @[1, 3, 3]) == 1.0 / 3.0
 
   test "euclidean distance":
     check euclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 5.0
 
+  test "euclidean distance empty":
+    check euclideanDistance(newSeq[float](0), newSeq[float](0)) == 0.0
+
   test "normalized euclidean distance":
     check normalizedEuclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 5.0 / 2.0
 
   test "squared euclidean distance":
     check squaredEuclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 25.0
+
+  test "squared euclidean distance empty":
+    check squaredEuclideanDistance(newSeq[float](0), newSeq[float](0)) == 0.0
 
   test "normalized squared euclidean distance":
     check normalizedSquaredEuclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 25.0 / 2.0
@@ -33,11 +44,17 @@ suite "Distance functions":
   test "cityblock distance with float":
     check cityblockDistance(@[0.0, 0.0], @[3.0, 4.0]) == 7.0
 
+  test "cityblock distance empty":
+    check cityblockDistance(newSeq[int](0), newSeq[int](0)) == 0.0
+
   test "normalized cityblock distance":
     check normalizedCityblockDistance(@[0, 0], @[3, 4]) == 7.0 / 2.0
 
   test "total variation distance":
     check totalVariationDistance(@[0, 0], @[3, 4]) == 3.5
+
+  test "total variation distance empty":
+    check totalVariationDistance(newSeq[int](0), newSeq[int](0)) == 0.0
 
   test "normalized total variation distance":
     check normalizedTotalVariationDistance(@[0, 0], @[3, 4]) == 3.5 / 2.0
@@ -45,8 +62,22 @@ suite "Distance functions":
   test "jaccard distance":
     check jaccardDistance(@[1, 2], @[2, 3]) == 0.4
 
+  test "jaccard distance all zeros":
+    check jaccardDistance(@[0, 0], @[0, 0]) == 0.0
+
+  test "jaccard distance empty":
+    check jaccardDistance(newSeq[int](0), newSeq[int](0)) == 0.0
+
   test "cosine distance":
     check cosineDistance(@[1.0, 0.0], @[0.0, 1.0]) == 1.0
+
+  test "cosine distance zero vector":
+    check isNaN(cosineDistance(@[0.0, 0.0], @[1.0, 0.0]))
+    check isNaN(cosineDistance(@[1.0, 0.0], @[0.0, 0.0]))
+    check isNaN(cosineDistance(@[0.0, 0.0], @[0.0, 0.0]))
+
+  test "cosine distance empty":
+    check isNaN(cosineDistance(newSeq[float](0), newSeq[float](0)))
 
   test "kl divergence distance":
     let x1 = @[0.5'f64, 0.5'f64]
@@ -65,9 +96,36 @@ suite "Distance functions":
     let x2 = @[0.0'f64, 0.5'f64]
     check klDivergenceDistance(x1, x2) == Inf
 
+  test "kl divergence with negative values":
+    check isNaN(klDivergenceDistance(@[-1.0'f64, 0.5'f64], @[0.25'f64, 0.5'f64]))
+    check isNaN(klDivergenceDistance(@[0.5'f64, 0.5'f64], @[0.25'f64, -0.5'f64]))
+
+  test "kl divergence empty":
+    check klDivergenceDistance(newSeq[float](0), newSeq[float](0)) == 0.0
+
   test "distance with mismatched lengths raises ValueError":
     expect(ValueError):
       discard euclideanDistance(@[1, 2], @[1, 2, 3])
+
+  test "symmetry of distances":
+    let a = @[1.0, 2.0, 3.0]
+    let b = @[4.0, 5.0, 6.0]
+    check hammingDistance(a, b) == hammingDistance(b, a)
+    check euclideanDistance(a, b) == euclideanDistance(b, a)
+    check squaredEuclideanDistance(a, b) == squaredEuclideanDistance(b, a)
+    check cityblockDistance(a, b) == cityblockDistance(b, a)
+    check totalVariationDistance(a, b) == totalVariationDistance(b, a)
+    check jaccardDistance(a, b) == jaccardDistance(b, a)
+    check cosineDistance(a, b) == cosineDistance(b, a)
+
+  test "single element arrays":
+    check hammingDistance(@[1], @[2]) == 1.0
+    check euclideanDistance(@[3.0], @[0.0]) == 3.0
+    check cityblockDistance(@[3], @[0]) == 3.0
+    check totalVariationDistance(@[3], @[0]) == 1.5
+    check jaccardDistance(@[1.0], @[2.0]) == 0.5
+    check cosineDistance(@[1.0], @[2.0]) == 0.0
+    check klDivergenceDistance(@[1.0'f64], @[2.0'f64]) == ln(0.5)
 
 suite "Pairwise":
 
@@ -132,7 +190,7 @@ suite "Pairwise":
     check dist[1][0] == 2.0
     check dist[1][1] == 0.0
 
-  test "pairwise preallocated too small raises ValueError":
+  test "pairwise preallocated too small rows raises ValueError":
     let X = @[
       @[1.0, 0.0],
       @[0.0, 1.0]
@@ -140,6 +198,20 @@ suite "Pairwise":
     var dist = newSeqWith(1, newSeq[float](1))
     expect(ValueError):
       pairwise(dist, X, euclideanDistance)
+
+  test "pairwise preallocated too small columns raises ValueError":
+    let X = @[
+      @[1.0, 0.0],
+      @[0.0, 1.0]
+    ]
+    var dist = newSeqWith(2, newSeq[float](1))
+    expect(ValueError):
+      pairwise(dist, X, euclideanDistance)
+
+  test "pairwise empty input":
+    let X: seq[seq[float]] = @[]
+    let dist = pairwise(X, euclideanDistance)
+    check dist.len == 0
 
 suite "Symmetrize":
 
@@ -169,3 +241,10 @@ suite "Symmetrize":
   test "symmetrize non-square raises ValueError":
     expect(ValueError):
       discard symmetrize(@[@[1, 2], @[3, 4], @[5, 6]])
+
+  test "symmetrize empty matrix":
+    let input: seq[seq[int]] = @[]
+    check symmetrize(input) == newSeq[seq[int]]()
+    var mutableInput: seq[seq[int]] = @[]
+    symmetrize(mutableInput)
+    check mutableInput == newSeq[seq[int]]()

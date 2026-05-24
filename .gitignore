@@ -1,0 +1,27 @@
+# Compiled binaries (no extension)
+bench_*
+!bench_*.nim
+test_*
+!test_*.nim
+
+# Nim build artifacts
+nimcache/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Profiling reports
+gprof_report.txt
+*.prof
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
