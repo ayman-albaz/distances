@@ -1,159 +1,211 @@
+{.experimental: "strictFuncs".}
+
+import std/math
+import std/sequtils
+
 type
-    Submodule* = object
-        name*: string
+  SymmetrizeDir* = enum
+    sdLowerToUpper  ## Copy the lower triangle to the upper triangle
+    sdUpperToLower  ## Copy the upper triangle to the lower triangle
 
-proc initSubmodule*(): Submodule =
-    Submodule(name: "Anonymous")
+template checkSameLength(x1, x2: openArray) =
+  if x1.len != x2.len:
+    raise newException(ValueError, "Input arrays must have the same length")
 
+template applyNormalize(result: var float, n: int, normalize: bool) =
+  if normalize and n > 0:
+    result = result / n.float
 
-import math
-import sequtils
+func sumOfSquaredDiffs[T: SomeNumber](x1, x2: openArray[T]): float =
+  let n = x1.len
+  result = 0.0
+  for k in 0 ..< n:
+    let d = x1[k].float - x2[k].float
+    result += d * d
 
-{.nanChecks: on, infChecks: on.}
-proc hamming_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var total: int32 = 0
-    for k in 0..num_cols-1:
-        total += (x1[k] != x2[k]).int32
-    if normalize:
-        return total.float / num_cols.float
-    else:
-        return total.float
+func sumOfAbsDiffs[T: SomeNumber](x1, x2: openArray[T]): float =
+  let n = x1.len
+  result = 0.0
+  for k in 0 ..< n:
+    result += abs(x1[k].float - x2[k].float)
 
+func hammingDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the Hamming distance between two arrays.
+  ##
+  ## The Hamming distance is the number of positions at which the
+  ## corresponding elements are different.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  var total = 0
+  for k in 0 ..< n:
+    total += int(x1[k] != x2[k])
+  result = total.float
+  applyNormalize(result, n, normalize)
 
-proc euclidean_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var total: typeof(x1[0]) = 0
-    var total_intermediate: typeof(x1[0]) = 0
-    for k in 0..num_cols-1:
-        total_intermediate = (x1[k] - x2[k])
-        total += total_intermediate * total_intermediate
-    if normalize:
-        return sqrt(total.float) / num_cols.float
-    else:
-        return sqrt(total.float)
+func euclideanDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the Euclidean (L2) distance between two arrays.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  result = sqrt(sumOfSquaredDiffs(x1, x2))
+  applyNormalize(result, n, normalize)
 
+func squaredEuclideanDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the squared Euclidean distance between two arrays.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  result = sumOfSquaredDiffs(x1, x2)
+  applyNormalize(result, n, normalize)
 
-proc sqeuclidean_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var total: typeof(x1[0]) = 0
-    var total_intermediate: typeof(x1[0]) = 0
-    for k in 0..num_cols-1:
-        total_intermediate = (x1[k] - x2[k])
-        total += total_intermediate * total_intermediate
-    if normalize:
-        return total.float / num_cols.float
-    else:
-        return total.float
+func cityblockDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the city block (Manhattan, L1) distance between two arrays.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  result = sumOfAbsDiffs(x1, x2)
+  applyNormalize(result, n, normalize)
 
+func totalVariationDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the total variation distance between two arrays.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  result = sumOfAbsDiffs(x1, x2) / 2.0
+  applyNormalize(result, n, normalize)
 
-proc cityblock_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var total: typeof(x1[0]) = 0
-    for k in 0..num_cols-1:
-        total += abs(x1[k] - x2[k])
-    if normalize:
-        return total.float / num_cols.float
-    else:
-        return total.float
+func jaccardDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the Jaccard distance between two arrays.
+  ##
+  ## Returns `1 - (sum(min(x1, x2)) / sum(max(x1, x2)))`.
+  ## The `normalize` parameter is accepted for API consistency but has no effect.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  var totalMin = 0.0
+  var totalMax = 0.0
+  for k in 0 ..< n:
+    let a = x1[k].float
+    let b = x2[k].float
+    totalMin += min(a, b)
+    totalMax += max(a, b)
+  if totalMax == 0.0:
+    result = 0.0
+  else:
+    result = 1.0 - totalMin / totalMax
 
+func cosineDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the cosine distance between two arrays.
+  ##
+  ## Returns `1 - cosine_similarity`. The `normalize` parameter is accepted
+  ## for API consistency but has no effect.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  var totalX1X2 = 0.0
+  var totalX1Sq = 0.0
+  var totalX2Sq = 0.0
+  for k in 0 ..< n:
+    let a = x1[k].float
+    let b = x2[k].float
+    totalX1X2 += a * b
+    totalX1Sq += a * a
+    totalX2Sq += b * b
+  if totalX1Sq == 0.0 or totalX2Sq == 0.0:
+    result = 0.0
+  else:
+    result = 1.0 - totalX1X2 / (sqrt(totalX1Sq) * sqrt(totalX2Sq))
 
-proc totalvariation_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var total: typeof(x1[0]) = 0
-    for k in 0..num_cols-1:
-        total += abs(x1[k] - x2[k])
-    if normalize:
-        return total.float / 2.0.float / num_cols.float
-    else:
-        return total.float / 2.0.float
+func klDivergenceDistance*[T: SomeNumber](x1, x2: openArray[T], normalize: bool = false): float =
+  ## Computes the Kullback-Leibler divergence from `x2` to `x1`.
+  ##
+  ## The `normalize` parameter is accepted for API consistency but has no effect.
+  checkSameLength(x1, x2)
+  let n = x1.len
+  var total = 0.0
+  for k in 0 ..< n:
+    let a = x1[k].float
+    let b = x2[k].float
+    if a == 0.0:
+      continue
+    if b == 0.0:
+      return Inf
+    total += a * ln(a / b)
+  result = total
 
+func pairwise*[T: SomeNumber](X: openArray[seq[T]], distance: (proc(x1, x2: openArray[T], normalize: bool): float {.noSideEffect.}), normalize: bool = false): seq[seq[float]] =
+  ## Computes the pairwise distance matrix for a collection of vectors.
+  ##
+  ## The returned matrix is lower-triangular (including the diagonal).
+  ## Use `symmetrize` to obtain a full symmetric matrix.
+  let numRows = X.len
+  result = newSeqWith(numRows, newSeq[float](numRows))
+  for i in 0 ..< numRows:
+    for j in 0 .. i:
+      result[i][j] = distance(X[i], X[j], normalize)
 
-proc jaccard_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var 
-        total_min: typeof(x1[0]) = 0
-        total_max: typeof(x1[0]) = 0
-    for k in 0..num_cols-1:
-        total_min += min(x1[k], x2[k])
-        total_max += max(x1[k], x2[k])
-    if total_max == 0:
-        return 0.0.float
-    else:
-        return 1.0.float - (total_min / total_max).float
+proc pairwise*[T: SomeNumber](dst: var seq[seq[float]], X: openArray[seq[T]], distance: (proc(x1, x2: openArray[T], normalize: bool): float {.noSideEffect.}), normalize: bool = false) =
+  ## Fills a preallocated pairwise distance matrix for a collection of vectors.
+  ##
+  ## The `dst` matrix must have at least `X.len` rows and columns.
+  ## Only the lower triangle (including the diagonal) is written.
+  let numRows = X.len
+  if dst.len < numRows:
+    raise newException(ValueError, "Result matrix has too few rows")
+  for i in 0 ..< numRows:
+    if dst[i].len < numRows:
+      raise newException(ValueError, "Result matrix row " & $i & " has too few columns")
+  for i in 0 ..< numRows:
+    for j in 0 .. i:
+      dst[i][j] = distance(X[i], X[j], normalize)
 
+func symmetrize*[T: SomeNumber](X: openArray[seq[T]], how: SymmetrizeDir = sdLowerToUpper): seq[seq[T]] =
+  ## Returns a symmetrized copy of a square matrix.
+  let numRows = X.len
+  if numRows == 0:
+    return @[]
+  let numCols = X[0].len
+  if numRows != numCols:
+    raise newException(ValueError, "Matrix must be square")
+  result = newSeqWith(numRows, newSeq[T](numCols))
+  for i in 0 ..< numRows:
+    for j in 0 ..< numCols:
+      result[i][j] = X[i][j]
+  if how == sdLowerToUpper:
+    for i in 0 ..< numCols:
+      for j in 0 .. i:
+        result[j][i] = X[i][j]
+  else:
+    for i in 0 ..< numCols:
+      for j in 0 .. i:
+        result[i][j] = X[j][i]
 
-proc cosine_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var 
-        total_x12: typeof(x1[0]) = 0
-        total_x11: typeof(x1[0]) = 0
-        total_x22: typeof(x1[0]) = 0
-    for k in 0..num_cols-1:
-        total_x12 += x1[k] * x2[k]
-        total_x11 += x1[k] * x1[k]
-        total_x22 += x2[k] * x2[k]
-    if total_x11 == 0 or total_x22 == 0:
-        return 0.0.float
-    else:
-        return 1.0.float - total_x12.float / (sqrt(total_x11.float) * sqrt(total_x22.float))
+proc symmetrize*[T: SomeNumber](X: var seq[seq[T]], how: SymmetrizeDir = sdLowerToUpper) =
+  ## Mutates a square matrix to make it symmetric in-place.
+  let numRows = X.len
+  if numRows == 0:
+    return
+  let numCols = X[0].len
+  if numRows != numCols:
+    raise newException(ValueError, "Matrix must be square")
+  if how == sdLowerToUpper:
+    for i in 0 ..< numCols:
+      for j in 0 .. i:
+        X[j][i] = X[i][j]
+  else:
+    for i in 0 ..< numCols:
+      for j in 0 .. i:
+        X[i][j] = X[j][i]
 
+when defined(distancesUseWeave):
+  import weave
 
-proc kldivergence_distance*[T: SomeNumber](x1, x2: seq[T], normalize: bool = false): float =
-    let num_cols = len(x1)
-    var total: float
-    for k in 0..num_cols-1:
-        if x1[k] == 0 and x2[k] == 0:
-            continue
-        else:
-            total += x1[k].float * ln(x1[k] / x2[k]).float
-    return total.float
+  proc pairwiseWeave*[T: SomeNumber](dst: var seq[seq[float]], X: openArray[seq[T]], distance: (proc(x1, x2: openArray[T], normalize: bool): float {.noSideEffect.}), normalize: bool = false) =
+    ## Fills a preallocated pairwise distance matrix using Weave for parallel execution.
+    ## The Weave runtime must be initialized by the caller before invoking this proc.
+    let numRows = X.len
+    if dst.len < numRows:
+      raise newException(ValueError, "Result matrix has too few rows")
+    for i in 0 ..< numRows:
+      if dst[i].len < numRows:
+        raise newException(ValueError, "Result matrix row " & $i & " has too few columns")
 
-
-proc pairwise*[T: SomeNumber](X: seq[seq[T]], distance: (proc(x1, x2: seq[T], normalize: bool): float), normalize: bool = false): seq[seq[float]] =
-    # Computes the pairwise distance of a 2D matrix across the selected distance
-    let num_rows = len(X)
-    var dist = newSeqWith(num_rows, newSeq[float](num_rows))
-    for i in 0||(num_rows-1):
-        for j in 0..i:
-            dist[i][j] = distance(X[i], X[j], normalize)
-    return dist
-
-
-proc symmetrize*(X: seq[seq[SomeNumber]], how: string = "l=>u"): seq[seq[SomeNumber]] = 
-    # Mutates X symmetrical by copying upper triangle to lower triangle ("u=>l") or lower triangle to upper triangle ("l=>r")
-    let num_rows = len(X)
-    let num_cols = len(X[0])
-    var X_copy = X
-    if num_rows != num_cols:
-        raise newException(ValueError, "Tensor must be symmetrical")
-    if how != "l=>u" and how != "u=>l":
-        raise newException(ValueError, "'how' must be one of 'l=>u' or 'u=>l'")
-    if how == "l=>u":
-        for i in 0..(num_cols-1):
-            for j in 0..i:
-                X_copy[j][i] = X[i][j]
-    else:
-        for i in 0..(num_cols-1):
-            for j in 0..i:
-                X_copy[i][j] = X[j][i]
-    return X_copy
-
-
-proc symmetrize*(X: var seq[seq[SomeNumber]], how: string = "l=>u"): seq[seq[SomeNumber]] = 
-    # Mutates X symmetrical by copying upper triangle to lower triangle ("u=>l") or lower triangle to upper triangle ("l=>r")
-    let num_rows = len(X)
-    let num_cols = len(X[0])
-    if num_rows != num_cols:
-        raise newException(ValueError, "Tensor must be symmetrical")
-    if how != "l=>u" and how != "u=>l":
-        raise newException(ValueError, "'how' must be one of 'l=>u' or 'u=>l'")
-    if how == "l=>u":
-        for i in 0..(num_cols-1):
-            for j in 0..i:
-                X[j][i] = X[i][j]
-    else:
-        for i in 0..(num_cols-1):
-            for j in 0..i:
-                X[i][j] = X[j][i]
-    return X
+    syncScope():
+      parallelFor i in 0 ..< numRows:
+        captures: {numRows, X, dst, distance, normalize}
+        for j in 0 .. i:
+          dst[i][j] = distance(X[i], X[j], normalize)

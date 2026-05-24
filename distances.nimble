@@ -10,5 +10,3 @@ srcDir        = "src"
 # Dependencies
 
 requires "nim >= 1.4.6"
-requires "arraymancer >= 0.6.2"
-requires "neo >= 0.3.1"

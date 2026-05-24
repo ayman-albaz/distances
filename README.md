@@ -4,89 +4,42 @@
 
 Distances is a high performance Nim library for calculating distances.
 
-This library is designed to allow users to calculate common distance metrics across all the popular sequence based libraries in Nim.
-
-## Supported Libraries
-Current supported sequence based libraries include:
-1. [sequtils](https://github.com/nim-lang/Nim/blob/devel/lib/pure/collections/sequtils.nim)
-2. [arraymancer](https://github.com/mratsim/Arraymancer)
-3. [neo](https://github.com/andreaferretti/neo)
+This library is designed to allow users to calculate common distance metrics using pure Nim sequences.
 
 
 ## Supported Distance Metrics
 Current supported distance metrics include:
 
-| Distance          | Command                         |
-|-------------------|---------------------------------|
-| Hamming           | hamming_distance(x1, x2)        |
-| Euclidean         | euclidean_distance(x1, x2)      |
-| Squared Euclidean | sqeuclidean_distance(x1, x2)    |
-| City Block        | cityblock_distance(x1, x2)      |
-| Total Variation   | totalvariation_distance(x1, x2) |
-| Jaccard           | jaccard_distance(x1, x2)        |
-| Cosine            | cosine_distance(x1, x2)         |
-| KL Divergence     | kldivergence_distance(x1, x2)   |
+| Distance          | Command                           |
+|-------------------|-----------------------------------|
+| Hamming           | hammingDistance(x1, x2)           |
+| Euclidean         | euclideanDistance(x1, x2)         |
+| Squared Euclidean | squaredEuclideanDistance(x1, x2)  |
+| City Block        | cityblockDistance(x1, x2)         |
+| Total Variation   | totalVariationDistance(x1, x2)    |
+| Jaccard           | jaccardDistance(x1, x2)           |
+| Cosine            | cosineDistance(x1, x2)            |
+| KL Divergence     | klDivergenceDistance(x1, x2)      |
 
 ## Examples 
 
-### Calculating Cosine Distance - sequtils
+### Calculating Cosine Distance
 Note: All computations are done row-wise.
 ```Nim
 import sequtils
-import distances/seq
+import distances
 
-let 
+let
     num_rows = 100
     num_cols = 100
     input_seq_int = newSeq[int](num_cols)
     input_seq_seq_int = newSeqWith(num_rows, newSeq[int](num_cols))
 
 # 1D distance
-echo cosine_distance(input_seq_int, input_seq_int)
+echo cosineDistance(input_seq_int, input_seq_int)
 
 # 2D distance (Pairwise)
-echo pairwise(input_seq_seq_int, cosine_distance)
-```
-
-
-### Calculating Cosine Distance - arraymancer
-Note: Only 2D Tensors are supported. All computations are done column wise.
-```Nim
-import arraymancer
-import distances/tensor
-
-let 
-    num_rows = 100
-    num_cols = 100
-    input_tensor_1d_int = zeros[int](1, num_cols)
-    input_tensor_2d_int = zeros[int](num_rows, num_cols)
-
-# 1D distance
-echo cosine_distance(input_tensor_1d_int, input_tensor_1d_int)
-
-# 2D distance (Pairwise)
-echo pairwise(input_tensor_2d_int, cosine_distance)
-```
-
-
-### Calculating Cosine Distance - neo
-Note: All computations are done column wise.
-Warning: Neo matrices seem to run 1-2 order of magnitudes slower than sequtils and arraymancer. Please contact me or submit a PR if you know why.
-```Nim
-import neo
-import distances/vector
-
-let 
-    num_rows = 100
-    num_cols = 100
-    input_vector_int = makeVector(num_cols, proc(i: int): int = 0)
-    input_matrix_int = makeMatrix(num_rows, num_cols, proc(i, j: int): int = 0)
-
-# 1D distance
-echo cosine_distance(input_vector_int, input_vector_int)
-
-# 2D distance (Pairwise)
-echo pairwise(input_matrix_int, cosine_distance)
+echo pairwise(input_seq_seq_int, cosineDistance)
 ```
 
 ### Normalization
@@ -94,32 +47,38 @@ All distance metrics support the optional `normalize` (defaults to `false`) para
 
 E.g.
 ```Nim
-discard cosine_distance(input_vector_int, input_vector_int, normalize=true)
-discard pairwise(input_matrix_int, cosine_distance, normalize=true)
+discard cosineDistance(input_seq_int, input_seq_int, normalize=true)
+discard pairwise(input_seq_seq_int, cosineDistance, normalize=true)
 ```
 
 ### Symmetry
-The `pairwise` procs always compute the lower left triangle of the 2D sequence to save time. To get a full matrix, use the `symmetrize(X, how: string = "l=>u")` proc.
+The `pairwise` proc computes only the lower-left triangle (including the diagonal) to save time. To obtain a full symmetric matrix, use `symmetrize` with the `SymmetrizeDir` enum.
 
 E.g.
 ```Nim
-discard symmetrize(X, "l=>u")	# Copy lower left triangle to upper right triangle
-discard symmetrize(X, "u=>l")	# Copy upper right triangle to lower left triangle
-``` 
+import distances
+
+discard symmetrize(X, sdLowerToUpper)  # Copy lower triangle to upper triangle
+discard symmetrize(X, sdUpperToLower)  # Copy upper triangle to lower triangle
+```
+
+### Working with arrays and other sequences
+All 1D distance functions accept `openArray[T]`, so they work with `seq`, `array`, and string slices interchangeably:
+
+```Nim
+let a = [1, 2, 3]
+let b = [1, 3, 3]
+echo hammingDistance(a, b)  # Works with arrays too
+```
 
 ## Performance
 
-To get optimal performance, here are the recommended compiler flags:
-`nim --cc:gcc --passC:"-fopenmp -ffast-math" --passL:"-fopenmp -ffast-math" --d:release -t:-mavx2 -t:-mfma c -r myScript.nim`.
-- openmp -> Multiprocessing for the `pairwise` procs. Number of threads is equal to ENV variable `OMP_NUM_THREADS`.
-- ffast-math -> ~2x float multiplication speedups
-- d:release -> ~100x pairwise speedup
-- d:danger -> ~120x pairwise speedup
-- t:-mavx2 and -t:-mfma -> ~0.20x pairwise speedup
+To get optimal performance, compile with `--d:release` or `--d:danger`:
+- `--d:release` -> ~100x pairwise speedup
+- `--d:danger` -> ~120x pairwise speedup
 
 
 ## TODO
-- Neo matrices seem to run 1-2 orders of magnitudes slower than sequtils and arraymancer. The reason is unknown to me.
 - Add more distance metrics
 - Add support for distance metrics with more than 2 arguments
 
@@ -128,4 +87,3 @@ Performance, feature, and documentation PR's are always welcome.
 
 ## Contact
 I can be reached at aymanalbaz98@gmail.com
-

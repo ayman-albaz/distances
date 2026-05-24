@@ -1,2 +1,2 @@
-import distances/seq, distances/tensor, distances/vector
-export seq, tensor, vector
+import distances/seq
+export seq
