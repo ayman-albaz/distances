@@ -9,23 +9,38 @@ suite "Distance functions":
     check hammingDistance(@[1, 2, 3], @[1, 3, 3]) == 1.0
     check hammingDistance(@[1, 2, 3], @[4, 5, 6]) == 3.0
 
-  test "hamming distance normalized":
-    check hammingDistance(@[1, 2, 3], @[1, 3, 3], normalize = true) == 1.0 / 3.0
+  test "hamming distance with float":
+    check hammingDistance(@[1.0, 2.0, 3.0], @[1.0, 3.0, 3.0]) == 1.0
+
+  test "normalized hamming distance":
+    check normalizedHammingDistance(@[1, 2, 3], @[1, 3, 3]) == 1.0 / 3.0
 
   test "euclidean distance":
     check euclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 5.0
 
-  test "euclidean distance normalized":
-    check euclideanDistance(@[0.0, 0.0], @[3.0, 4.0], normalize = true) == 5.0 / 2.0
+  test "normalized euclidean distance":
+    check normalizedEuclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 5.0 / 2.0
 
   test "squared euclidean distance":
     check squaredEuclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 25.0
 
+  test "normalized squared euclidean distance":
+    check normalizedSquaredEuclideanDistance(@[0.0, 0.0], @[3.0, 4.0]) == 25.0 / 2.0
+
   test "cityblock distance":
     check cityblockDistance(@[0, 0], @[3, 4]) == 7.0
 
+  test "cityblock distance with float":
+    check cityblockDistance(@[0.0, 0.0], @[3.0, 4.0]) == 7.0
+
+  test "normalized cityblock distance":
+    check normalizedCityblockDistance(@[0, 0], @[3, 4]) == 7.0 / 2.0
+
   test "total variation distance":
     check totalVariationDistance(@[0, 0], @[3, 4]) == 3.5
+
+  test "normalized total variation distance":
+    check normalizedTotalVariationDistance(@[0, 0], @[3, 4]) == 3.5 / 2.0
 
   test "jaccard distance":
     check jaccardDistance(@[1, 2], @[2, 3]) == 0.4
@@ -70,14 +85,25 @@ suite "Pairwise":
     check dist[2][1] == euclideanDistance(X[2], X[1])
     check dist[2][2] == 0.0
 
-  test "pairwise with normalize":
+  test "pairwise with int input":
+    let X = @[
+      @[1, 0],
+      @[0, 1]
+    ]
+    let dist = pairwise(X, hammingDistance)
+    check dist is seq[seq[float]]
+    check dist[0][0] == 0.0
+    check dist[1][0] == 2.0
+    check dist[1][1] == 0.0
+
+  test "pairwise normalized":
     let X = @[
       @[1.0, 0.0],
       @[0.0, 1.0]
     ]
-    let dist = pairwise(X, euclideanDistance, normalize = true)
+    let dist = pairwise(X, normalizedEuclideanDistance)
     check dist[0][0] == 0.0
-    check dist[1][0] == euclideanDistance(X[1], X[0], normalize = true)
+    check dist[1][0] == normalizedEuclideanDistance(X[1], X[0])
     check dist[1][1] == 0.0
 
   test "pairwise preallocated":
@@ -94,6 +120,17 @@ suite "Pairwise":
     check dist[2][0] == euclideanDistance(X[2], X[0])
     check dist[2][1] == euclideanDistance(X[2], X[1])
     check dist[2][2] == 0.0
+
+  test "pairwise preallocated with int input":
+    let X = @[
+      @[1, 0],
+      @[0, 1]
+    ]
+    var dist = newSeqWith(2, newSeq[float](2))
+    pairwise(dist, X, hammingDistance)
+    check dist[0][0] == 0.0
+    check dist[1][0] == 2.0
+    check dist[1][1] == 0.0
 
   test "pairwise preallocated too small raises ValueError":
     let X = @[
